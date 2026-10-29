@@ -1,91 +1,126 @@
-// CAPA DE DATOS - cuentas de usuario
-// Guarda los usuarios y la sesion en el almacenamiento del telefono.
+// CAPA DE DATOS - cuentas y sesion
+// Antes las cuentas vivian en el telefono con AsyncStorage. Ahora viven
+// en Firebase: Authentication guarda el correo y la contrasena, y
+// Firestore guarda el nombre y el rol de cada usuario.
 //
-// En la Etapa 3, Foro 2, estas funciones pasaran a usar Firebase
-// Authentication y Firestore. El resto de la aplicacion no cambia,
-// porque solo conoce estas funciones.
+// Los nombres de las funciones son los mismos de antes a proposito, para
+// que el contexto y las pantallas de login y registro no cambien.
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
-const LLAVE_USUARIOS = 'tacoexpress_usuarios';
-const LLAVE_SESION = 'tacoexpress_sesion';
+const COLECCION = 'usuarios';
 
-// Cuentas que ya vienen creadas para poder probar la aplicacion.
-const USUARIOS_INICIALES = [
-  {
-    nombre: 'Administrador',
-    correo: 'admin@tacoexpress.com',
-    clave: 'Admin1234',
-    rol: 'administrador',
-  },
-  {
-    nombre: 'Cliente de prueba',
-    correo: 'cliente@tacoexpress.com',
-    clave: 'Cliente1234',
+// Firebase avisa de los errores con codigos en ingles. Aqui se traducen
+// a mensajes que el usuario pueda entender.
+function mensajeDeError(error) {
+  const codigo = error?.code || '';
+  const mensajes = {
+    'auth/invalid-credential': 'El correo o la contrasena no son correctos.',
+    'auth/invalid-email': 'El correo no tiene un formato valido.',
+    'auth/user-not-found': 'El correo o la contrasena no son correctos.',
+    'auth/wrong-password': 'El correo o la contrasena no son correctos.',
+    'auth/email-already-in-use': 'Ya existe una cuenta con ese correo.',
+    'auth/weak-password': 'La contrasena es demasiado debil.',
+    'auth/too-many-requests': 'Demasiados intentos. Espere un momento.',
+    'auth/network-request-failed': 'Sin conexion. Revise su internet.',
+  };
+  return mensajes[codigo] || 'No se pudo completar la operacion.';
+}
+
+// Busca el nombre y el rol del usuario en Firestore.
+// Si el documento no existe todavia (por ejemplo, una cuenta creada
+// desde la consola de Firebase), se crea uno con el rol de cliente.
+async function perfilDe(cuenta) {
+  const referencia = doc(db, COLECCION, cuenta.uid);
+  const encontrado = await getDoc(referencia);
+
+  if (encontrado.exists()) {
+    const datos = encontrado.data();
+    return {
+      uid: cuenta.uid,
+      correo: cuenta.email,
+      nombre: datos.nombre || cuenta.email,
+      rol: datos.rol || 'cliente',
+    };
+  }
+
+  const perfilNuevo = {
+    nombre: cuenta.displayName || cuenta.email,
+    correo: cuenta.email,
     rol: 'cliente',
-  },
-];
-
-async function leerUsuarios() {
-  const guardado = await AsyncStorage.getItem(LLAVE_USUARIOS);
-  if (guardado) return JSON.parse(guardado);
-  await AsyncStorage.setItem(LLAVE_USUARIOS, JSON.stringify(USUARIOS_INICIALES));
-  return USUARIOS_INICIALES;
-}
-
-async function guardarUsuarios(usuarios) {
-  await AsyncStorage.setItem(LLAVE_USUARIOS, JSON.stringify(usuarios));
-}
-
-// Devuelve el usuario sin la contrasena, que nunca sale de esta capa.
-function sinClave(usuario) {
-  const { clave, ...resto } = usuario;
-  return resto;
+    creadoEn: serverTimestamp(),
+  };
+  await setDoc(referencia, perfilNuevo);
+  return { uid: cuenta.uid, correo: cuenta.email, nombre: perfilNuevo.nombre, rol: 'cliente' };
 }
 
 export async function iniciarSesion(correo, clave) {
-  const usuarios = await leerUsuarios();
-  const encontrado = usuarios.find(
-    (u) => u.correo.toLowerCase() === correo.trim().toLowerCase()
-  );
-
-  if (!encontrado || encontrado.clave !== clave) {
-    throw new Error('El correo o la contrasena no son correctos.');
+  try {
+    const credencial = await signInWithEmailAndPassword(
+      auth,
+      correo.trim().toLowerCase(),
+      clave
+    );
+    return await perfilDe(credencial.user);
+  } catch (error) {
+    throw new Error(mensajeDeError(error));
   }
-
-  const sesion = sinClave(encontrado);
-  await AsyncStorage.setItem(LLAVE_SESION, JSON.stringify(sesion));
-  return sesion;
 }
 
 export async function registrar(datos) {
-  const usuarios = await leerUsuarios();
-  const correo = datos.correo.trim().toLowerCase();
+  const correo = (datos.correo || '').trim().toLowerCase();
+  try {
+    const credencial = await createUserWithEmailAndPassword(auth, correo, datos.clave);
 
-  if (usuarios.some((u) => u.correo.toLowerCase() === correo)) {
-    throw new Error('Ya existe una cuenta con ese correo.');
+    // Las cuentas nuevas siempre nacen como cliente. El rol de
+    // administrador se asigna a mano desde la consola de Firebase,
+    // para que nadie pueda darselo a si mismo desde el registro.
+    const referencia = doc(db, COLECCION, credencial.user.uid);
+    await setDoc(referencia, {
+      nombre: (datos.nombre || '').trim() || correo,
+      correo,
+      rol: 'cliente',
+      creadoEn: serverTimestamp(),
+    });
+
+    return {
+      uid: credencial.user.uid,
+      correo,
+      nombre: (datos.nombre || '').trim() || correo,
+      rol: 'cliente',
+    };
+  } catch (error) {
+    throw new Error(mensajeDeError(error));
   }
-
-  // Quien se registra desde la aplicacion entra como cliente.
-  const nuevo = {
-    nombre: datos.nombre.trim(),
-    correo,
-    clave: datos.clave,
-    rol: 'cliente',
-  };
-
-  await guardarUsuarios([...usuarios, nuevo]);
-
-  const sesion = sinClave(nuevo);
-  await AsyncStorage.setItem(LLAVE_SESION, JSON.stringify(sesion));
-  return sesion;
 }
 
 export async function cerrarSesion() {
-  await AsyncStorage.removeItem(LLAVE_SESION);
+  await signOut(auth);
 }
 
-export async function leerSesion() {
-  const guardado = await AsyncStorage.getItem(LLAVE_SESION);
-  return guardado ? JSON.parse(guardado) : null;
+// Al abrir la aplicacion, Firebase tarda un instante en recuperar la
+// sesion guardada. Por eso no se puede leer auth.currentUser de una vez:
+// hay que esperar el primer aviso de Firebase y recien ahi responder.
+export function leerSesion() {
+  return new Promise((resolver) => {
+    const cancelar = onAuthStateChanged(auth, async (cuenta) => {
+      cancelar();
+      if (!cuenta) {
+        resolver(null);
+        return;
+      }
+      try {
+        resolver(await perfilDe(cuenta));
+      } catch (error) {
+        resolver(null);
+      }
+    });
+  });
 }
