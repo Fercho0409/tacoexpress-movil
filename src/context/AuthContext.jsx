@@ -5,7 +5,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import {
   cerrarSesion as cerrarSesionServicio,
+  googleDisponible,
   iniciarSesion as iniciarSesionServicio,
+  iniciarSesionConGoogle as iniciarSesionConGoogleServicio,
   leerSesion,
   registrar as registrarServicio,
 } from '../services/cuentasApi';
@@ -38,6 +40,16 @@ export function AuthProvider({ children }) {
     return sesion;
   }
 
+  // Segunda forma de entrar: con la cuenta de Google.
+  // El servicio hace el trabajo; aqui solo se guarda el resultado, igual
+  // que con el correo. Para el resto de la aplicacion da lo mismo por
+  // cual de las dos puertas entro el usuario.
+  async function entrarConGoogle() {
+    const sesion = await iniciarSesionConGoogleServicio();
+    setUsuario(sesion);
+    return sesion;
+  }
+
   async function crearCuenta(datos) {
     const sesion = await registrarServicio(datos);
     setUsuario(sesion);
@@ -53,6 +65,8 @@ export function AuthProvider({ children }) {
     usuario,
     cargando,
     entrar,
+    entrarConGoogle,
+    googleDisponible,
     crearCuenta,
     salir,
     haySesion: usuario !== null,

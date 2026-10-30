@@ -6,16 +6,25 @@
 // Los nombres de las funciones son los mismos de antes a proposito, para
 // que el contexto y las pantallas de login y registro no cambien.
 
+import { Platform } from 'react-native';
 import {
+  GoogleAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
 const COLECCION = 'usuarios';
+
+// El inicio de sesion con Google abre una ventana del navegador para que
+// el usuario elija su cuenta. Esa ventana solo existe en la web: en el
+// telefono haria falta compilar la aplicacion con codigo nativo, cosa que
+// Expo Go no permite. Por eso el boton solo se muestra en la version web.
+export const googleDisponible = Platform.OS === 'web';
 
 // Firebase avisa de los errores con codigos en ingles. Aqui se traducen
 // a mensajes que el usuario pueda entender.
@@ -30,6 +39,11 @@ function mensajeDeError(error) {
     'auth/weak-password': 'La contrasena es demasiado debil.',
     'auth/too-many-requests': 'Demasiados intentos. Espere un momento.',
     'auth/network-request-failed': 'Sin conexion. Revise su internet.',
+    'auth/popup-closed-by-user': 'Se cerro la ventana de Google antes de terminar.',
+    'auth/cancelled-popup-request': 'Se cancelo el inicio de sesion con Google.',
+    'auth/popup-blocked': 'El navegador bloqueo la ventana de Google. Permitala e intente de nuevo.',
+    'auth/account-exists-with-different-credential':
+      'Ese correo ya tiene una cuenta registrada con contrasena.',
   };
   return mensajes[codigo] || 'No se pudo completar la operacion.';
 }
@@ -68,6 +82,25 @@ export async function iniciarSesion(correo, clave) {
       correo.trim().toLowerCase(),
       clave
     );
+    return await perfilDe(credencial.user);
+  } catch (error) {
+    throw new Error(mensajeDeError(error));
+  }
+}
+
+// Inicio de sesion con la cuenta de Google del usuario.
+// Google verifica quien es la persona y le devuelve a Firebase un
+// comprobante firmado; Firebase crea la cuenta sola si es la primera vez.
+// Nunca pasa la contrasena de Google por la aplicacion.
+export async function iniciarSesionConGoogle() {
+  if (!googleDisponible) {
+    throw new Error('El inicio con Google solo esta disponible en la version web.');
+  }
+  try {
+    const proveedor = new GoogleAuthProvider();
+    const credencial = await signInWithPopup(auth, proveedor);
+    // perfilDe se encarga de crear el documento del usuario en Firestore
+    // con el rol de cliente si la cuenta entra por primera vez.
     return await perfilDe(credencial.user);
   } catch (error) {
     throw new Error(mensajeDeError(error));

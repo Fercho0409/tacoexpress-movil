@@ -18,12 +18,17 @@ import { COLORES } from '../theme';
 
 export default function PantallaLogin() {
   const router = useRouter();
-  const { entrar } = useAuth();
+  const { entrar, entrarConGoogle, googleDisponible } = useAuth();
 
   const [datos, setDatos] = useState({ correo: '', clave: '' });
   const [errores, setErrores] = useState({});
   const [aviso, setAviso] = useState('');
   const [entrando, setEntrando] = useState(false);
+  const [entrandoGoogle, setEntrandoGoogle] = useState(false);
+
+  // Mientras una de las dos formas de entrar esta trabajando, se apagan
+  // los dos botones para que el usuario no dispare las dos a la vez.
+  const ocupado = entrando || entrandoGoogle;
 
   function cambiar(campo, valor) {
     setDatos((antes) => ({ ...antes, [campo]: valor }));
@@ -44,6 +49,22 @@ export default function PantallaLogin() {
       setAviso(e.message);
     } finally {
       setEntrando(false);
+    }
+  }
+
+  // Con Google no hay campos que validar: la verificacion la hace Google
+  // en su propia ventana y devuelve el resultado ya comprobado.
+  async function enviarConGoogle() {
+    setErrores({});
+    setAviso('');
+    try {
+      setEntrandoGoogle(true);
+      await entrarConGoogle();
+      router.replace('/');
+    } catch (e) {
+      setAviso(e.message);
+    } finally {
+      setEntrandoGoogle(false);
     }
   }
 
@@ -85,18 +106,42 @@ export default function PantallaLogin() {
         {!!errores.clave && <Text style={estilos.error}>{errores.clave}</Text>}
 
         <TouchableOpacity
-          style={[estilos.boton, entrando && estilos.botonApagado]}
+          style={[estilos.boton, ocupado && estilos.botonApagado]}
           onPress={enviar}
-          disabled={entrando}
+          disabled={ocupado}
         >
           <Text style={estilos.botonTexto}>
             {entrando ? 'Entrando...' : 'Iniciar sesion'}
           </Text>
         </TouchableOpacity>
 
+        {/* El inicio con Google necesita abrir una ventana del navegador.
+            En el telefono esa ventana no existe sin compilar la aplicacion
+            con codigo nativo, asi que el boton solo aparece en la web. */}
+        {googleDisponible && (
+          <>
+            <View style={estilos.separador}>
+              <View style={estilos.linea} />
+              <Text style={estilos.separadorTexto}>o</Text>
+              <View style={estilos.linea} />
+            </View>
+
+            <TouchableOpacity
+              style={[estilos.botonGoogle, ocupado && estilos.botonApagado]}
+              onPress={enviarConGoogle}
+              disabled={ocupado}
+            >
+              <Text style={estilos.botonGoogleTexto}>
+                {entrandoGoogle ? 'Abriendo Google...' : 'Continuar con Google'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+
         <TouchableOpacity
           style={estilos.botonBorde}
           onPress={() => router.push('/registro')}
+          disabled={ocupado}
         >
           <Text style={estilos.botonBordeTexto}>Crear una cuenta</Text>
         </TouchableOpacity>
@@ -169,6 +214,27 @@ const estilos = StyleSheet.create({
   },
   botonApagado: { opacity: 0.6 },
   botonTexto: { color: COLORES.acentoTexto, fontWeight: '600', fontSize: 15 },
+  separador: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 18,
+    marginBottom: 14,
+  },
+  linea: { flex: 1, height: 1, backgroundColor: COLORES.borde },
+  separadorTexto: {
+    color: COLORES.textoTenue,
+    fontSize: 12,
+    marginHorizontal: 12,
+  },
+  botonGoogle: {
+    backgroundColor: COLORES.superficieAlta,
+    borderWidth: 1,
+    borderColor: COLORES.borde,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  botonGoogleTexto: { color: COLORES.texto, fontWeight: '600', fontSize: 15 },
   botonBorde: {
     borderWidth: 1,
     borderColor: COLORES.borde,
