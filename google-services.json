@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "232799174294",
+    "project_id": "tacoexpress-dae8a",
+    "storage_bucket": "tacoexpress-dae8a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:232799174294:android:4b4e70d569f901173f8cb7",
+        "android_client_info": {
+          "package_name": "sv.edu.udb.tacoexpress"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "232799174294-b9mjf1psbp2cv42924h79k8k5eku2ksj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "sv.edu.udb.tacoexpress",
+            "certificate_hash": "9066dee669b6b0220348c65326c4342049d0ee52"
+          }
+        },
+        {
+          "client_id": "232799174294-3tuu84mveuglj2u1a0fhe87eqjkp2ku9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBG34HhlXVj-trce1LQzVKD5XAYK_fXLNI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "232799174294-3tuu84mveuglj2u1a0fhe87eqjkp2ku9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

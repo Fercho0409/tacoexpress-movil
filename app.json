@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "tacoexpress-movil",
+    "name": "TacoExpress",
     "slug": "tacoexpress-movil",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,9 +8,12 @@
     "scheme": "tacoexpressmovil",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "sv.edu.udb.tacoexpress"
     },
     "android": {
+      "package": "sv.edu.udb.tacoexpress",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -25,6 +28,7 @@
     },
     "plugins": [
       "expo-router",
+      "@react-native-google-signin/google-signin",
       [
         "expo-splash-screen",
         {
@@ -37,6 +41,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "65b263a0-ca42-4876-9232-a5b9ab2b6f7b"
+      }
     }
   }
 }
