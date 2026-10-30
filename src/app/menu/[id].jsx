@@ -1,7 +1,7 @@
 // PANTALLA: Detalle de un platillo
 // Recibe el id por la direccion y pide ese platillo al servicio.
-// Las acciones de administracion (marcar agotado, eliminar) solo
-// aparecen si la sesion activa es de administrador.
+// El cliente puede agregarlo a su pedido; las acciones de administracion
+// (editar, marcar agotado, eliminar) solo aparecen para el administrador.
 
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useCarrito } from '../../context/CarritoContext';
 import {
   alternarDisponible,
   buscarPlatillo,
@@ -25,12 +27,28 @@ import {
 } from '../../services/menuApi';
 import { COLORES } from '../../theme';
 
+// Alert.alert no existe en la version web: ahi la pregunta se hace con
+// el cuadro de dialogo del navegador. Esta funcion elige el que toca
+// segun donde se este ejecutando la aplicacion.
+function preguntar(titulo, mensaje, textoAceptar, alAceptar) {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${titulo}\n\n${mensaje}`)) alAceptar();
+    return;
+  }
+  Alert.alert(titulo, mensaje, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: textoAceptar, style: 'destructive', onPress: alAceptar },
+  ]);
+}
+
 export default function PantallaDetalle() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { esAdministrador } = useAuth();
+  const { esAdministrador, haySesion } = useAuth();
+  const { agregar } = useCarrito();
   const [platillo, setPlatillo] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [agregado, setAgregado] = useState(false);
 
   // useFocusEffect vuelve a leer el platillo cada vez que se entra a la
   // pantalla, para que los cambios hechos al editarlo se vean de inmediato.
@@ -55,25 +73,27 @@ export default function PantallaDetalle() {
     setPlatillo(actualizado);
   }
 
+  // Al agregar se muestra un aviso corto en el mismo boton, para que el
+  // usuario vea que su toque tuvo efecto sin salir de la pantalla.
+  function agregarAlPedido() {
+    agregar(platillo);
+    setAgregado(true);
+    setTimeout(() => setAgregado(false), 1500);
+  }
+
   function confirmarEliminar() {
     // Se usa un valor de respaldo porque al abrir la pantalla el platillo
     // todavia no ha terminado de cargar y vale null.
     const nombre = platillo ? platillo.nombre : 'este platillo';
 
-    Alert.alert(
+    preguntar(
       'Eliminar platillo',
       `Se quitara "${nombre}" del menu.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            await eliminarPlatillo(id);
-            router.back();
-          },
-        },
-      ]
+      'Eliminar',
+      async () => {
+        await eliminarPlatillo(id);
+        router.back();
+      }
     );
   }
 
@@ -123,6 +143,28 @@ export default function PantallaDetalle() {
           {platillo.disponible ? 'Disponible' : 'Agotado'}
         </Text>
       </View>
+
+      {/* PEDIR
+          Solo se puede pedir con la sesion iniciada: asi cada pedido queda
+          amarrado a una cuenta. Un platillo agotado no se puede agregar. */}
+      {platillo.disponible && (
+        haySesion ? (
+          <TouchableOpacity style={estilos.botonNaranja} onPress={agregarAlPedido}>
+            <Text style={estilos.botonTexto}>
+              {agregado ? 'Agregado a su pedido' : 'Agregar a mi pedido'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={estilos.botonEspaciado}
+            onPress={() => router.push('/login')}
+          >
+            <Text style={estilos.botonEspaciadoTexto}>
+              Inicie sesion para pedir
+            </Text>
+          </TouchableOpacity>
+        )
+      )}
 
       {/* ACCIONES DE ADMINISTRADOR
           El cliente solo consulta el platillo; no puede modificarlo. */}
@@ -190,6 +232,7 @@ const estilos = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginTop: 18,
+    marginBottom: 18,
     alignItems: 'center',
   },
   cajaRoja: {
@@ -197,6 +240,7 @@ const estilos = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginTop: 18,
+    marginBottom: 18,
     alignItems: 'center',
   },
   textoVerde: { color: COLORES.exito, fontWeight: '600' },

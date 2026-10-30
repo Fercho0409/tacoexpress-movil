@@ -1,0 +1,79 @@
+rules_version = '2';
+
+// REGLAS DE SEGURIDAD DE CLOUD FIRESTORE - TacoExpress
+//
+// Estas reglas se aplican en los servidores de Google, no en la aplicacion.
+// Esconder un boton en la pantalla no protege nada: cualquiera puede llamar
+// a la base de datos por fuera de la aplicacion. Lo que de verdad protege
+// los datos es lo que esta escrito aqui.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Hay alguien con sesion iniciada en Firebase Authentication.
+    function haySesion() {
+      return request.auth != null;
+    }
+
+    // Busca el documento del usuario en la coleccion "usuarios" y revisa
+    // su rol. El rol se guarda en la base de datos, nunca lo manda la
+    // aplicacion: asi nadie puede decir que es administrador.
+    function esAdministrador() {
+      return haySesion()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'administrador';
+    }
+
+    // MENU DE PRODUCTOS
+    // La carta es publica: se puede ver sin iniciar sesion, igual que el
+    // menu pegado en la pared del local. Modificarla es cosa del negocio.
+    match /platillos/{platilloId} {
+      allow read: if true;
+      allow create, update, delete: if esAdministrador();
+    }
+
+    // USUARIOS
+    // Cada quien ve su propio perfil; el administrador los ve todos.
+    // El rol se fija en "cliente" al crear la cuenta y no se puede cambiar
+    // desde la aplicacion: para hacer administrador a alguien hay que
+    // entrar a la consola de Firebase.
+    match /usuarios/{uid} {
+      allow read: if haySesion()
+                  && (request.auth.uid == uid || esAdministrador());
+
+      allow create: if haySesion()
+                    && request.auth.uid == uid
+                    && request.resource.data.rol == 'cliente';
+
+      allow update: if haySesion()
+                    && request.auth.uid == uid
+                    && request.resource.data.rol == resource.data.rol;
+
+      allow delete: if false;
+    }
+
+    // PEDIDOS
+    // El cliente solo alcanza los pedidos que llevan su propio uid.
+    // El administrador los ve todos y es el unico que cambia el estado.
+    // Nadie borra pedidos: un pedido cancelado se marca, no se elimina,
+    // para que quede el registro de lo que paso.
+    match /pedidos/{pedidoId} {
+      allow read: if haySesion()
+                  && (resource.data.uid == request.auth.uid || esAdministrador());
+
+      // Al crear un pedido, el uid guardado tiene que ser el de quien lo
+      // esta haciendo: asi nadie puede hacer pedidos a nombre de otro.
+      allow create: if haySesion()
+                    && request.resource.data.uid == request.auth.uid;
+
+      allow update: if esAdministrador();
+      allow delete: if false;
+    }
+
+    // Cualquier otra coleccion queda cerrada. Si manana se agrega una
+    // nueva, hay que escribirle sus reglas a proposito.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

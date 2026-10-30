@@ -4,11 +4,13 @@
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useCarrito } from '../context/CarritoContext';
 import { COLORES } from '../theme';
 
 export default function PantallaInicio() {
   const router = useRouter();
   const { usuario, cargando, haySesion, esAdministrador, salir } = useAuth();
+  const { unidades } = useCarrito();
 
   if (cargando) {
     return (
@@ -36,6 +38,31 @@ export default function PantallaInicio() {
       <TouchableOpacity style={estilos.boton} onPress={() => router.push('/menu')}>
         <Text style={estilos.botonTexto}>Ver el menu</Text>
       </TouchableOpacity>
+
+      {/* El pedido en curso se recuerda mientras la aplicacion este abierta,
+          asi que se avisa desde el inicio si quedo algo sin confirmar. */}
+      {unidades > 0 && (
+        <TouchableOpacity
+          style={estilos.botonBorde}
+          onPress={() => router.push('/carrito')}
+        >
+          <Text style={estilos.botonBordeTexto}>
+            Ver mi pedido ({unidades})
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* El administrador ve todos los pedidos; el cliente solo los suyos. */}
+      {haySesion && (
+        <TouchableOpacity
+          style={estilos.botonBorde}
+          onPress={() => router.push('/pedidos')}
+        >
+          <Text style={estilos.botonBordeTexto}>
+            {esAdministrador ? 'Pedidos recibidos' : 'Mis pedidos'}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {esAdministrador && (
         <TouchableOpacity

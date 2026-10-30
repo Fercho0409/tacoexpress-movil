@@ -14,12 +14,14 @@ import {
 } from 'react-native';
 import TarjetaPlatillo from '../../components/TarjetaPlatillo';
 import { useAuth } from '../../context/AuthContext';
+import { useCarrito } from '../../context/CarritoContext';
 import { agruparPorCategoria, listarPlatillos } from '../../services/menuApi';
 import { COLORES } from '../../theme';
 
 export default function PantallaMenu() {
   const router = useRouter();
   const { esAdministrador } = useAuth();
+  const { unidades, total } = useCarrito();
   const [secciones, setSecciones] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -63,7 +65,12 @@ export default function PantallaMenu() {
       <SectionList
         sections={secciones}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={estilos.contenido}
+        contentContainerStyle={[
+          estilos.contenido,
+          // Se deja espacio abajo para que la barra del pedido no tape
+          // el ultimo platillo de la lista.
+          unidades > 0 && estilos.contenidoConBarra,
+        ]}
         ListHeaderComponent={
           <View style={estilos.encabezado}>
             <Text style={estilos.titulo}>Taqueria Los Hernandez</Text>
@@ -95,6 +102,21 @@ export default function PantallaMenu() {
           <Text style={estilos.vacio}>Aun no hay platillos registrados.</Text>
         }
       />
+
+      {/* BARRA DEL PEDIDO
+          Aparece pegada abajo solo cuando hay algo en el carrito, para
+          que el usuario pueda revisarlo sin volver al inicio. */}
+      {unidades > 0 && (
+        <TouchableOpacity
+          style={estilos.barra}
+          onPress={() => router.push('/carrito')}
+        >
+          <Text style={estilos.barraTexto}>
+            Ver mi pedido ({unidades})
+          </Text>
+          <Text style={estilos.barraTotal}>${total.toFixed(2)}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -109,6 +131,7 @@ const estilos = StyleSheet.create({
   },
   cargando: { marginTop: 10, color: COLORES.textoSuave },
   contenido: { padding: 16, paddingBottom: 32 },
+  contenidoConBarra: { paddingBottom: 96 },
   encabezado: { marginBottom: 16 },
   titulo: { fontSize: 28, fontWeight: '700', color: COLORES.texto },
   subtitulo: { fontSize: 14, color: COLORES.textoSuave, marginTop: 2 },
@@ -140,4 +163,19 @@ const estilos = StyleSheet.create({
     margin: 16,
     borderRadius: 8,
   },
+  barra: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    backgroundColor: COLORES.acento,
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  barraTexto: { color: COLORES.acentoTexto, fontWeight: '700', fontSize: 15 },
+  barraTotal: { color: COLORES.acentoTexto, fontWeight: '700', fontSize: 16 },
 });
